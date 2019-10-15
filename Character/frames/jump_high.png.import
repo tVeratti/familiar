@@ -2,15 +2,15 @@
 
 importer="texture"
 type="StreamTexture"
-path="res://.import/charge.png-1e1909035f60114ed7d9e58ff0d7fa91.stex"
+path="res://.import/jump_high.png-08eb81412c98d01b08769350cfb2a151.stex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Character/charge.png"
-dest_files=[ "res://.import/charge.png-1e1909035f60114ed7d9e58ff0d7fa91.stex" ]
+source_file="res://Character/frames/jump_high.png"
+dest_files=[ "res://.import/jump_high.png-08eb81412c98d01b08769350cfb2a151.stex" ]
 
 [params]
 

@@ -6,7 +6,8 @@
 [node name="Test" type="Node2D"]
 
 [node name="Familiar" parent="." instance=ExtResource( 1 )]
-position = Vector2( 433.469, 446.197 )
+position = Vector2( 591.469, 452.197 )
 
 [node name="Node2D" parent="." instance=ExtResource( 2 )]
 position = Vector2( 508.25, 510.15 )
+

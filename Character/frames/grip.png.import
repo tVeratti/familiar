@@ -2,15 +2,15 @@
 
 importer="texture"
 type="StreamTexture"
-path="res://.import/jump_far.png-fbfeed04fd91446913bd08575dc41f8c.stex"
+path="res://.import/grip.png-ddb5228c47a2fe599a0136dca6918f02.stex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Character/jump_far.png"
-dest_files=[ "res://.import/jump_far.png-fbfeed04fd91446913bd08575dc41f8c.stex" ]
+source_file="res://Character/frames/grip.png"
+dest_files=[ "res://.import/grip.png-ddb5228c47a2fe599a0136dca6918f02.stex" ]
 
 [params]
 
