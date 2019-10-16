@@ -12,7 +12,7 @@ const SPEED_SPRINT = 600
 
 const MAX_JUMP_FORCE = 1000
 const JUMP_CHARGE_RATE = 30
-const JUMP_CHARGE_DEADZONE = JUMP_CHARGE_RATE * 5
+const JUMP_CHARGE_DEADZONE = JUMP_CHARGE_RATE * 10
 const JUMP_VELOCITY_ACCELERATION = 0.2
 
 const JUMP_VELOCITY_MAXIMUM = 10
@@ -24,14 +24,18 @@ var state = STATES.WAIT
 var _velocity = Vector2.ZERO
 var _jump_force = 0
 var _jump_velocity = Vector2.ZERO
-var _jump_direction = 0
+
+var _jump_direction = 1
+var _gravity_direction = Vector2.DOWN
 
 onready var _sprite:AnimatedSprite = $Sprite
 onready var _jump_preview:Line2D = $Line2D
+onready var _collision:CollisionShape2D = $CollisionShape2D
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
-    pass # Replace with function body.
+    set_state(STATES.WALK)
+    reset_jump_velocity()
 
 func _physics_process(delta):
     var on_floor = is_on_floor()
@@ -45,15 +49,18 @@ func _physics_process(delta):
     var is_jumping = Input.is_action_just_released("jump")
 
     var direction = 1 if is_moving_right else -1 if is_moving_left else 0
+    if direction != 0: _jump_direction = direction
         
-    if on_floor:
+    if on_floor or on_wall:
+        
         if is_jumping: jump(direction)
-        elif is_charging_jump: charge_jump(direction)
+        elif is_charging_jump: charge_jump(direction, on_wall)
         else: move(direction, is_sprinting)
-        
+                
         # Flip sprite based on movement direction
-        if is_moving_right: _sprite.flip_h = false
-        elif is_moving_left: _sprite.flip_h = true
+        if not on_wall:
+            if is_moving_right: _sprite.flip_h = false
+            elif is_moving_left: _sprite.flip_h = true
     
     else:
         if is_moving_right:
@@ -64,34 +71,22 @@ func _physics_process(delta):
             _velocity.x = lerp(_velocity.x, 0, FRICTION_AIR)
     
     # Move the kinematic body
-    # if not on_wall or _velocity.y >= -1:
-    #     _gravity_direction = Vector2.DOWN
-    # else:
-    #     var collision = move_and_collide(_velocity, true, true, true)
-    #     if collision != null:
-    #         _gravity_direction = -collision.normal
+    if not on_wall:
+        _gravity_direction = Vector2.DOWN
+    elif not is_jumping:
+        climb(direction, is_charging_jump)
 
-    #     if is_moving_right: _velocity.y -= ACCELERATION * _gravity_direction.x
-    #     if is_moving_left: _velocity.y += ACCELERATION * _gravity_direction.x
-    #     else: _velocity.y = lerp(_velocity.y, 0, FRICTION * 2)
-
-    #     _velocity.y = min(_velocity.y, SPEED_CLIMB)
-    #     _velocity.y = max(_velocity.y, -SPEED_CLIMB)
-
-    #     _sprite.play("grip")
-    
-    _velocity.y += GRAVITY * delta
+    _velocity += _gravity_direction * GRAVITY * delta
     _velocity = move_and_slide(_velocity, Vector2.UP)
 
         
-func charge_jump(direction):
+func charge_jump(direction, on_wall):
     # Update jump force (cumulative)
     # The jump forve will be applied to the jump velocity.
     _jump_force = min(_jump_force + JUMP_CHARGE_RATE, MAX_JUMP_FORCE)
     
     if _jump_force > JUMP_CHARGE_DEADZONE:
         if direction != 0:
-            _jump_direction = direction
             # Increase horizontal velocity
             _jump_velocity.x = min(
                 _jump_velocity.x + 0.2,
@@ -100,10 +95,7 @@ func charge_jump(direction):
             # Reduce horizontal velocity
             _jump_velocity.x = max(
                 _jump_velocity.x - 0.2,
-                JUMP_VELOCITY_MINIMUM)
-        
-        if _jump_velocity.x <= JUMP_VELOCITY_MINIMUM:
-            _jump_direction = 0
+                0)
     
         # Slowly build y velocity, always
         _jump_velocity.y = min(
@@ -112,7 +104,8 @@ func charge_jump(direction):
 
         # Slow down and crouch...
         _velocity.x = lerp(_velocity.x, 0, FRICTION)
-        if abs(_velocity.x) < 200: set_state(STATES.CROUCH)
+        if abs(_velocity.x) < 200 and not on_wall:
+            set_state(STATES.CROUCH)
     
     _jump_preview.points = [
         Vector2.ZERO,
@@ -124,19 +117,26 @@ func charge_jump(direction):
 func jump(direction):
     set_state(STATES.JUMP)
 
-    # Apply direction to jump velocity
-    _jump_velocity.x *= _jump_direction
-    
-    _jump_velocity = _jump_velocity.normalized()
-    _jump_velocity *= _jump_force
-    
+    var launch_force = max(_jump_force, JUMP_CHARGE_DEADZONE) + abs(_velocity.x / 2)
+    var launch_velocity = _jump_velocity
+    launch_velocity.x *= _jump_direction
+    launch_velocity = launch_velocity.normalized()
+    launch_velocity *= launch_force
+       
     _velocity = Vector2(
-        _velocity.x + _jump_velocity.x,
-        -abs(_jump_velocity.y))
+        _velocity.x + launch_velocity.x,
+        -abs(launch_velocity.y))
     
     # Reset jump forces
+    reset_jump_velocity()
+
+
+func reset_jump_velocity():
+    _jump_preview.clear_points()
     _jump_force = 0
-    _jump_velocity = Vector2.ZERO
+    _jump_velocity = Vector2(
+        JUMP_VELOCITY_MINIMUM * 1.5,
+        JUMP_VELOCITY_MINIMUM)
 
 
 func move(direction, is_sprinting):
@@ -153,19 +153,57 @@ func move(direction, is_sprinting):
     _velocity.x = max(_velocity.x, -max_speed)
 
 
+func climb(direction, is_charging_jump):
+    set_state(STATES.CLIMB)
+    var collision = move_and_collide(_velocity, true, true, true)
+    if collision != null:
+         _gravity_direction = -collision.normal
+    
+    if not is_charging_jump:
+        if direction == 1: _velocity.y -= ACCELERATION * _gravity_direction.x
+        if direction == -1: _velocity.y += ACCELERATION * _gravity_direction.x
+        else: _velocity.y = lerp(_velocity.y, 0, FRICTION * 2)
+    
+        _velocity.y = min(_velocity.y, 200)
+        _velocity.y = max(_velocity.y, -200)
+    
+    else: _velocity.y = lerp(_velocity.y, 0, FRICTION * 2)
+
 func set_state(new_state):
-    #var prev_state = state
+    if new_state == state: return
+    
+    disable_collisions()
+    
     state = new_state
     match(new_state):
         STATES.WAIT:
             _sprite.play('walk')
+            $WalkCollision.disabled = false
         STATES.CROUCH:
             _sprite.play('crouch')
+            $CrouchCollision.disabled = false
         STATES.WALK:
             _sprite.play('walk')
+            $WalkCollision.disabled = false
         STATES.SPRINT:
-            _sprite.play('sprint')
+            _sprite.play('walk')
+            $WalkCollision.disabled = false
         STATES.JUMP:
-            _sprite.play('jump')
+            if _jump_direction == 1: _sprite.flip_h = false
+            elif _jump_direction == -1: _sprite.flip_h = true
+            
+            if _jump_velocity.x > _jump_velocity.y:
+                _sprite.play('jump_horizontal')
+                $JumpHorizontalCollision.disabled = false
+            else:
+                _sprite.play('jump_vertical')
+                $JumpVerticalCollision.disabled = false
         STATES.CLIMB:
             _sprite.play('climb')
+            $ClimbCollision.disabled = false
+
+
+func disable_collisions():
+    for child in get_children():
+        if child is CollisionShape2D:
+            child.disabled = true
