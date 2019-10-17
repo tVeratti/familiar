@@ -9,6 +9,7 @@ const FRICTION_AIR = 0.1
 
 const SPEED_NORMAL = 400
 const SPEED_SPRINT = 600
+const SPEED_CLIMB = 200
 
 const MAX_JUMP_FORCE = 1000
 const JUMP_CHARGE_RATE = 30
@@ -22,10 +23,12 @@ enum STATES { WAIT, CROUCH, WALK, SPRINT, JUMP, CLIMB }
 var state = STATES.WAIT
 
 var _velocity = Vector2.ZERO
-var _jump_force = 0
 var _jump_velocity = Vector2.ZERO
-
+var _jump_force = 0
 var _jump_direction = 1
+var _climb_started = false
+var _climb_force = -ACCELERATION
+
 var _gravity_direction = Vector2.DOWN
 
 onready var _sprite:AnimatedSprite = $Sprite
@@ -36,6 +39,7 @@ onready var _collision:CollisionShape2D = $CollisionShape2D
 func _ready():
     set_state(STATES.WALK)
     reset_jump_velocity()
+
 
 func _physics_process(delta):
     var on_floor = is_on_floor()
@@ -73,10 +77,12 @@ func _physics_process(delta):
     # Move the kinematic body
     if not on_wall:
         _gravity_direction = Vector2.DOWN
+        _climb_started = false
     elif not is_jumping:
         climb(direction, is_charging_jump)
 
-    _velocity += _gravity_direction * GRAVITY * delta
+    #_velocity += _gravity_direction * GRAVITY * delta
+    _velocity.y += GRAVITY * delta
     _velocity = move_and_slide(_velocity, Vector2.UP)
 
         
@@ -117,21 +123,35 @@ func charge_jump(direction, on_wall):
 func jump(direction):
     set_state(STATES.JUMP)
 
+    # Get the clamped jump force with x velocity to boost it.
     var launch_force = max(_jump_force, JUMP_CHARGE_DEADZONE) + abs(_velocity.x / 2)
     var launch_velocity = _jump_velocity
+    
+    # Adjust jump to the charged direction at time of release.
     launch_velocity.x *= _jump_direction
+    
+    # Make sure the y velocity is always upward (negative).
+    launch_velocity.y = -abs(launch_velocity.y)
+    
+    # Normalize the velocity to blend the directions and avoid
+    # abuse of additive diagonal velocity.
     launch_velocity = launch_velocity.normalized()
+    
+    # Multiply the normalized velocity to get the distance of
+    # the charged jump force.
     launch_velocity *= launch_force
+    
+    # Add in current x velocity to get momentum bonus.
+    launch_velocity.x += _velocity.x
        
-    _velocity = Vector2(
-        _velocity.x + launch_velocity.x,
-        -abs(launch_velocity.y))
+    _velocity = launch_velocity
     
     # Reset jump forces
     reset_jump_velocity()
 
 
 func reset_jump_velocity():
+    _climb_force = 0
     _jump_preview.clear_points()
     _jump_force = 0
     _jump_velocity = Vector2(
@@ -155,19 +175,30 @@ func move(direction, is_sprinting):
 
 func climb(direction, is_charging_jump):
     set_state(STATES.CLIMB)
+    
+    if not _climb_started:
+        _climb_started = true
+        _climb_force = abs(min(min(_velocity.y, 0) + abs(_velocity.x  / 2), 1000))
+    
+    _climb_force = max(_climb_force - 10, -ACCELERATION)
+    
+    # Check if the player has collided with a surface.
+    # Use the opposite of that surface's normal as the new gravity.
     var collision = move_and_collide(_velocity, true, true, true)
     if collision != null:
          _gravity_direction = -collision.normal
     
     if not is_charging_jump:
+        # Add a small amount of acceleration when climbing in either direction.
         if direction == 1: _velocity.y -= ACCELERATION * _gravity_direction.x
         if direction == -1: _velocity.y += ACCELERATION * _gravity_direction.x
-        else: _velocity.y = lerp(_velocity.y, 0, FRICTION * 2)
     
-        _velocity.y = min(_velocity.y, 200)
-        _velocity.y = max(_velocity.y, -200)
+        # Clamp climbing velocity within maximum speed range
+        _velocity.y = min(_velocity.y, SPEED_CLIMB)
+        _velocity.y = max(_velocity.y, -SPEED_CLIMB)
+        
+        _velocity.y -= _climb_force
     
-    else: _velocity.y = lerp(_velocity.y, 0, FRICTION * 2)
 
 func set_state(new_state):
     if new_state == state: return

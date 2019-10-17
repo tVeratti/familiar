@@ -13,4 +13,4 @@ position = Vector2( 13.443, -19.5311 )
 current = true
 
 [node name="Node2D" parent="." instance=ExtResource( 2 )]
-position = Vector2( -241.352, -3710.78 )
+position = Vector2( -189.732, -1172.81 )
