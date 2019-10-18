@@ -9,7 +9,7 @@ const FRICTION_AIR = 0.1
 
 const SPEED_NORMAL = 400
 const SPEED_SPRINT = 600
-const SPEED_CLIMB = 200
+const SPEED_CLIMB = 700
 
 const MAX_JUMP_FORCE = 1000
 const JUMP_CHARGE_RATE = 30
@@ -20,7 +20,7 @@ const JUMP_VELOCITY_MAXIMUM = 10
 const JUMP_VELOCITY_MINIMUM = 3
 
 enum STATES { WAIT, CROUCH, WALK, SPRINT, JUMP, CLIMB }
-var state = STATES.WAIT
+var _state = STATES.WAIT
 
 var _velocity = Vector2.ZERO
 var _jump_velocity = Vector2.ZERO
@@ -28,12 +28,17 @@ var _jump_force = 0
 var _jump_direction = 1
 var _climb_started = false
 var _climb_force = -ACCELERATION
+var _climb_boost = true
+var _climb_animate = true
 
 var _gravity_direction = Vector2.DOWN
 
 onready var _sprite:AnimatedSprite = $Sprite
 onready var _jump_preview:Line2D = $Line2D
 onready var _collision:CollisionShape2D = $CollisionShape2D
+
+onready var _climbTimer:Timer = $ClimbTimer
+onready var _animationTimer:Timer = $AnimationTimer
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
@@ -55,16 +60,13 @@ func _physics_process(delta):
     var direction = 1 if is_moving_right else -1 if is_moving_left else 0
     if direction != 0: _jump_direction = direction
         
-    if on_floor or on_wall:
-        
+    if on_floor:
         if is_jumping: jump(direction)
-        elif is_charging_jump: charge_jump(direction, on_wall)
+        elif is_charging_jump: charge_jump(direction, on_wall)                
         else: move(direction, is_sprinting)
-                
-        # Flip sprite based on movement direction
-        if not on_wall:
-            if is_moving_right: _sprite.flip_h = false
-            elif is_moving_left: _sprite.flip_h = true
+        
+        if is_moving_right: _sprite.flip_h = false
+        elif is_moving_left: _sprite.flip_h = true
     
     else:
         if is_moving_right:
@@ -75,14 +77,15 @@ func _physics_process(delta):
             _velocity.x = lerp(_velocity.x, 0, FRICTION_AIR)
     
     # Move the kinematic body
-    if not on_wall:
-        _gravity_direction = Vector2.DOWN
+    if on_floor:
         _climb_started = false
-    elif not is_jumping:
+    elif on_wall and not is_jumping:
         climb(direction, is_charging_jump)
+    else:
+        _gravity_direction = Vector2.DOWN
 
-    #_velocity += _gravity_direction * GRAVITY * delta
-    _velocity.y += GRAVITY * delta
+    _velocity += _gravity_direction * GRAVITY * delta
+    #_velocity.y += GRAVITY * delta
     _velocity = move_and_slide(_velocity, Vector2.UP)
 
         
@@ -175,37 +178,41 @@ func move(direction, is_sprinting):
 
 func climb(direction, is_charging_jump):
     set_state(STATES.CLIMB)
-    
-    if not _climb_started:
-        _climb_started = true
-        _climb_force = abs(min(min(_velocity.y, 0) + abs(_velocity.x  / 2), 1000))
-    
-    _climb_force = max(_climb_force - 10, -ACCELERATION)
-    
+       
     # Check if the player has collided with a surface.
     # Use the opposite of that surface's normal as the new gravity.
     var collision = move_and_collide(_velocity, true, true, true)
     if collision != null:
          _gravity_direction = -collision.normal
     
-    if not is_charging_jump:
-        # Add a small amount of acceleration when climbing in either direction.
-        if direction == 1: _velocity.y -= ACCELERATION * _gravity_direction.x
-        if direction == -1: _velocity.y += ACCELERATION * _gravity_direction.x
-    
-        # Clamp climbing velocity within maximum speed range
-        _velocity.y = min(_velocity.y, SPEED_CLIMB)
-        _velocity.y = max(_velocity.y, -SPEED_CLIMB)
+    if _climb_boost and direction != 0:
+        _sprite.play('climb_boost')
         
-        _velocity.y -= _climb_force
+        _animationTimer.start(0.4)
+        _climbTimer.start(0.5)
+        _climb_boost = false
+
+        # Add a small amount of acceleration when climbing in either direction.
+        _velocity.y -= SPEED_CLIMB
+         
+    else:
+        _velocity.y = lerp(_velocity.y, 0, 0.15)
+        
+        if not _climb_animate:
+            _climb_animate = true
+            _sprite.play('climb')
+
+    # Clamp climbing velocity within maximum speed range
+    _velocity.y = min(_velocity.y, SPEED_CLIMB)
+    _velocity.y = max(_velocity.y, -SPEED_CLIMB)
     
 
 func set_state(new_state):
-    if new_state == state: return
+    if new_state == _state: return
     
     disable_collisions()
     
-    state = new_state
+    _state = new_state
     match(new_state):
         STATES.WAIT:
             _sprite.play('walk')
@@ -238,3 +245,11 @@ func disable_collisions():
     for child in get_children():
         if child is CollisionShape2D:
             child.disabled = true
+
+
+func _on_ClimbTimer_timeout():
+    _climb_boost = true
+
+
+func _on_AnimationTimer_timeout():
+    _climb_animate = false

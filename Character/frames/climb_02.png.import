@@ -2,15 +2,15 @@
 
 importer="texture"
 type="StreamTexture"
-path="res://.import/block.png-c53addb12486162d7ef5cf5418ede69f.stex"
+path="res://.import/climb_02.png-4c57531267ae070b65cd0e660d74a8e6.stex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Map/block.png"
-dest_files=[ "res://.import/block.png-c53addb12486162d7ef5cf5418ede69f.stex" ]
+source_file="res://Character/frames/climb_02.png"
+dest_files=[ "res://.import/climb_02.png-4c57531267ae070b65cd0e660d74a8e6.stex" ]
 
 [params]
 

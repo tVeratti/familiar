@@ -1,16 +1,16 @@
 [gd_scene load_steps=3 format=2]
 
-[ext_resource path="res://Character/Familiar.tscn" type="PackedScene" id=1]
-[ext_resource path="res://Map/Map.tscn" type="PackedScene" id=2]
+[ext_resource path="res://Map/Map.tscn" type="PackedScene" id=1]
+[ext_resource path="res://Character/Familiar.tscn" type="PackedScene" id=2]
 
 [node name="Test" type="Node2D"]
 
-[node name="Familiar" parent="." instance=ExtResource( 1 )]
+[node name="Node2D" parent="." instance=ExtResource( 1 )]
+position = Vector2( -189.732, -1172.81 )
+
+[node name="Familiar" parent="." instance=ExtResource( 2 )]
 position = Vector2( 503.295, 316.861 )
 
 [node name="Camera2D" type="Camera2D" parent="Familiar"]
 position = Vector2( 13.443, -19.5311 )
 current = true
-
-[node name="Node2D" parent="." instance=ExtResource( 2 )]
-position = Vector2( -189.732, -1172.81 )
