@@ -9,8 +9,4 @@
 position = Vector2( -189.732, -1172.81 )
 
 [node name="Familiar" parent="." instance=ExtResource( 2 )]
-position = Vector2( 503.295, 316.861 )
-
-[node name="Camera2D" type="Camera2D" parent="Familiar"]
-position = Vector2( 13.443, -19.5311 )
-current = true
+position = Vector2( 323.613, 551.707 )
